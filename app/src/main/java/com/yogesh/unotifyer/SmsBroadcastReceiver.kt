@@ -8,8 +8,6 @@ import android.provider.Telephony.Sms.Intents.SMS_RECEIVED_ACTION
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-private const val TAG = "SmsBroadcastReceiver"
-
 class SmsBroadcastReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -28,23 +26,24 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             }
             context.getSharedPreferences("reciever", Context.MODE_PRIVATE).getString("number", null)
                 ?.let {
-
-                    if (it.equals(phoneNumber)) {
-                        val sdf = DateTimeFormatter.ofPattern("hh:mm a")
-                        val dt = LocalDateTime.now().format(sdf)
+                    if (it == phoneNumber) {
+                        val paymentDetails = Utils.extractTransactionDetails(smsMessageBuilder.toString()) ?: return
+                        val dateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
+                        val dt = LocalDateTime.now().format(dateTimeFormatter)
+                        paymentDetails.time = dt
+                        val finishIntent = Intent(Utils.ACTION_FINISH_ACTIVITY)
+                        context.sendBroadcast(finishIntent)
                         performTaskOnSmsReceived(context,
-                            smsMessageBuilder.toString(),dt
+                            paymentDetails,
+                            smsMessageBuilder.toString()
                         )
                     }
                 }
         }
     }
 
-    private fun performTaskOnSmsReceived(context: Context, messageBody: String, dt: String) {
-        FullScreenPaymentActivity.Get.showFullScreenPaymentNotification(
-            context,
-            messageBody,dt
-        )
+    private fun performTaskOnSmsReceived(context: Context, paymentDetails: PaymentDetails, messageText: String) {
+        Utils.showFullScreenPaymentNotification(context, paymentDetails,messageText)
     }
 
 }

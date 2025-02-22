@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
         if (!isSmsPermissionGranted()) askSmsPermissions()
         if (!isNotificationPermissionGranted()) askNotificationPermissions()
         toggleSenderOrReceiver(isReciever())
+//        toggleNotificationListenerService(true)
+//        toggleSmsReciever(true)
     }
 
     private fun isReciever(): Boolean {

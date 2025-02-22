@@ -6,16 +6,9 @@ import android.content.pm.PackageManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.telephony.SmsManager
-import android.util.Log
-
-private const val TAG = "MyNotificationListener"
 
 class MyNotificationListener : NotificationListenerService() {
     private var componentName: ComponentName? = null
-
-    override fun onCreate() {
-        super.onCreate()
-    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -45,10 +38,6 @@ class MyNotificationListener : NotificationListenerService() {
         )
     }
 
-    override fun onListenerConnected() {
-        super.onListenerConnected()
-    }
-
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
 
@@ -61,6 +50,8 @@ class MyNotificationListener : NotificationListenerService() {
 
     private fun smsSendMessage(text: String) {
         val smsManager = getSystemService(SmsManager::class.java)
+        val paymentDetails = Utils.extractTransactionDetails(text) ?: return
+        println(paymentDetails)
         smsManager.sendTextMessage(
             getSharedPreferences("sender", MODE_PRIVATE).getString("number", null), null, text,
             null, null
@@ -73,7 +64,6 @@ class MyNotificationListener : NotificationListenerService() {
         val text = extras?.getCharSequence("android.text").toString()
         if (packageName.equals("com.phonepe.app.business")) {
             smsSendMessage(text)
-            Log.d(TAG, "Notification Received: $text,    package name: $packageName")
         }
         if (packageName.equals("com.android.shell")) {
             smsSendMessage(text)

@@ -1,17 +1,16 @@
 package com.yogesh.unotifyer
 
-import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -35,14 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
+import com.yogesh.unotifyer.Utils.Companion.ACTION_FINISH_ACTIVITY
 import com.yogesh.unotifyer.ui.theme.UNotifyerTheme
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.regex.Pattern
+import kotlin.math.min
 
 
 class FullScreenPaymentActivity : ComponentActivity() {
@@ -51,6 +47,13 @@ class FullScreenPaymentActivity : ComponentActivity() {
     private var postTTSPlayer: MediaPlayer? = null
     private var ttsFile: File? = null
 
+    private val finishReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (ACTION_FINISH_ACTIVITY == intent?.action) {
+                finish()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,15 +62,20 @@ class FullScreenPaymentActivity : ComponentActivity() {
         preTTSPlayer = MediaPlayer.create(this, R.raw.pre)
         postTTSPlayer = MediaPlayer.create(this, R.raw.post)
 
-        val data = extractTransactionDetails(intent.getStringExtra("paymentDetails") ?: "")
-        data?.put("time",intent.getStringExtra("time").toString())
-
+        val paymentDetails = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getSerializableExtra(
+                "paymentDetails",
+                PaymentDetails::class.java
+            ) as PaymentDetails
+        } else {
+            intent.getSerializableExtra("paymentDetails") as PaymentDetails
+        }
         setContent {
             UNotifyerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
                         modifier = Modifier.padding(innerPadding),
-                        paymentDetails = data,
+                        paymentDetails = paymentDetails,
                         { finishAndRemoveTask() },
                         { playSequence() }
                     )
@@ -78,11 +86,13 @@ class FullScreenPaymentActivity : ComponentActivity() {
         textToSpeech = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 textToSpeech?.language = Locale("hi", "IN")
-                data?.get("amount")?.let { amount ->
-                    saveTTSAsTempFile(amount) { file ->
-                        ttsFile = file
-                        playSequence()
-                    }
+                Utils.saveTTSAsTempFile(
+                    this,
+                    textToSpeech,
+                    paymentDetails.amount
+                ) { file ->
+                    ttsFile = file
+                    playSequence()
                 }
             }
         }
@@ -92,176 +102,87 @@ class FullScreenPaymentActivity : ComponentActivity() {
                     WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
+        Handler(Looper.getMainLooper()).postDelayed({finishAfterTransition()},30000)
+        registerReceiver(finishReceiver, IntentFilter(ACTION_FINISH_ACTIVITY),Context.RECEIVER_NOT_EXPORTED)
     }
 
-    private fun saveTTSAsTempFile(text: String, callback: (File) -> Unit) {
-        val fileName = "tts_output.mp3"
-        val tempFile = File(filesDir, fileName)
-
-        val params = Bundle()
-        params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "tts_output")
-        textToSpeech?.setPitch(1.3f)
-        textToSpeech?.setSpeechRate(0.9f)
-        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-
-            override fun onDone(utteranceId: String?) {
-                Log.d("TTS", "TTS file saved: ${tempFile.absolutePath}")
-                callback(tempFile) // Return the file
-            }
-
-            override fun onError(utteranceId: String?) {
-                Log.e("TTS", "Error synthesizing TTS")
-            }
-        })
-
-        textToSpeech?.synthesizeToFile("$text", params, tempFile, "tts_output")
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(finishReceiver)
     }
 
     private fun playSequence() {
-        preTTSPlayer?.setOnCompletionListener {
-            ttsFile?.let {
-                MediaPlayer().apply {
-                    setDataSource(it.path)
-                    prepare()
-                    setOnCompletionListener {
-                        postTTSPlayer?.start()
-                    }
-                    start()
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        val midTTSPlayer = ttsFile?.let {
+            MediaPlayer().apply {
+                setDataSource(it.path)
+                prepare()
+                setOnCompletionListener {
+                    val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    val newVolume = min(maxVolume, (currentVolume * 0.8).toInt())
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+                    postTTSPlayer?.start()
                 }
             }
+        }
+        preTTSPlayer?.setOnCompletionListener {
+            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val newVolume = min(maxVolume, (currentVolume * 1.2).toInt())
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+            midTTSPlayer?.start()
         }
         preTTSPlayer?.start()
     }
 
-    private fun extractTransactionDetails(text: String): HashMap<String, String>? {
-        val pattern = Pattern.compile("Rs (\\d+) from (.+?) via PhonePe for txn (T\\d+)")
-        val matcher = pattern.matcher(text)
-
-        if (matcher.find()) {
-            val rupee = matcher.group(1)
-            val nameOrNumber = matcher.group(2)?.trim()
-            val txnId = matcher.group(3)
-            try {
-                return hashMapOf(
-                    Pair("amount", rupee),
-                    Pair("name", nameOrNumber ?: "NULL"),
-                    Pair("txn", txnId)
-                )
-            } catch (e: Exception) {
-                println("Error occurred while extracting transaction details: ${e.message}")
-                return null
-            }
-        } else {
-            println("No transaction details found in the text.")
-            return null
-        }
-    }
-
-    companion object Get {
-        private const val CHANNEL_ID = "payment_notifications"
-        private const val CHANNEL_NAME = "Payment Notifications"
-        private var NOTIFICATION_ID = 1
-
-        @SuppressLint("MissingPermission")
-        fun showFullScreenPaymentNotification(
-            context: Context,
-            paymentDetails: String,
-            time: String
-        ) {
-            // Create notification channel
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(
-                    CHANNEL_ID,
-                    CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Channel for payment notifications"
-                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
-                }
-                val notificationManager: NotificationManager =
-                    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                notificationManager.createNotificationChannel(channel)
-            }
-
-            // Create full-screen intent
-            NOTIFICATION_ID = (1..200).random()
-            val fullScreenIntent = Intent(context, FullScreenPaymentActivity::class.java).apply {
-                putExtra("paymentDetails", paymentDetails)
-                putExtra("time", time)
-            }
-            val fullScreenPendingIntent = PendingIntent.getActivity(
-                context,
-                0,
-                fullScreenIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Create notification
-            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setContentTitle("Payment Received")
-                .setContentText(paymentDetails)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setFullScreenIntent(fullScreenPendingIntent, true)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setAutoCancel(true)
-                .build()
-
-            // Show notification
-            with(NotificationManagerCompat.from(context)) {
-                notify(NOTIFICATION_ID, notification)
-            }
-        }
-    }
-}
-
-@Composable
-fun Greeting(
-    modifier: Modifier = Modifier,
-    paymentDetails: HashMap<String, String>?,
-    close: () -> Unit,
-    speak: () -> Unit
-) {
-    Row(
-        horizontalArrangement = Arrangement.End,
-        modifier = Modifier.fillMaxSize()
+    @Composable
+    fun Greeting(
+        modifier: Modifier = Modifier,
+        paymentDetails: PaymentDetails,
+        close: () -> Unit,
+        speak: () -> Unit
     ) {
-        IconButton(
-            close, Modifier
-                .align(Alignment.Top)
-                .padding(24.dp)
-                .size(80.dp)
+        Row(
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxSize()
         ) {
-            Icon(
-                painterResource(R.drawable.baseline_close), "Close", Modifier
-                    .padding(20.dp)
+            IconButton(
+                close, Modifier
+                    .align(Alignment.Top)
+                    .padding(24.dp)
                     .size(80.dp)
-            )
+            ) {
+                Icon(
+                    painterResource(R.drawable.baseline_close), "Close", Modifier
+                        .padding(20.dp)
+                        .size(80.dp)
+                )
+            }
         }
-    }
-    Column(
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        paymentDetails?.let {
+        Column(
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize()
+        ) {
             Text(text = "Rupee")
             Text(
-                text = it["amount"].toString(),
+                text = paymentDetails.amount,
                 fontSize = MaterialTheme.typography.bodyLarge.fontSize.times(6),
                 modifier = Modifier.padding(bottom = 50.dp)
             )
             Text(text = "From")
             Text(
-                text = it["name"].toString(),
+                text = "${paymentDetails.name}",
                 fontSize = MaterialTheme.typography.titleLarge.fontSize
             )
             Text(text = "At", Modifier.padding(top = 8.dp))
-            Text(text = "${it["time"]}", fontSize = MaterialTheme.typography.titleLarge.fontSize)
+            Text(
+                text = paymentDetails.time,
+                fontSize = MaterialTheme.typography.titleLarge.fontSize
+            )
             Text(text = "Transaction ID", Modifier.padding(top = 16.dp))
-            Text(text = "${it["txn"]}")
+            Text(text = "${paymentDetails.txn}")
             Button(
                 speak,
                 Modifier
@@ -274,8 +195,6 @@ fun Greeting(
             ) {
                 Text(text = "Speak")
             }
-        } ?: run {
-            Text(text = "No payment details available.")
         }
     }
 }
