@@ -5,8 +5,10 @@ import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -60,12 +62,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (!isNotificationListenerPermissionGranted()) redirectToSettings()
-        if (!isSmsPermissionGranted()) askSmsPermissions()
-        if (!isNotificationPermissionGranted()) askNotificationPermissions()
         toggleSenderOrReceiver(isReciever())
+//        Utils.showFullScreenPaymentNotification(this,PaymentDetails("100","","",""),"payment received")
 //        toggleNotificationListenerService(true)
 //        toggleSmsReciever(true)
+    }
+
+    private fun allpermissionCheck() {
+        if (!isSmsPermissionGranted()) askSmsPermissions()
+        if (isReciever()) {
+            if (!isNotificationPermissionGranted()) askNotificationPermissions()
+        } else {
+            if (!isNotificationListenerPermissionGranted()) redirectToSettings()
+        }
     }
 
     private fun isReciever(): Boolean {
@@ -81,6 +90,7 @@ class MainActivity : ComponentActivity() {
             toggleNotificationListenerService(true)
             toggleSmsReciever(false)
         }
+        allpermissionCheck()
     }
 
     private fun toggleNotificationListenerService(enabled: Boolean) {
@@ -105,6 +115,28 @@ class MainActivity : ComponentActivity() {
 
     private fun askSmsPermissions() {
         if (!isSmsPermissionGranted()) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.SEND_SMS
+                ) || ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.RECEIVE_SMS
+                ) || ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.READ_SMS
+                )
+            ) {
+                Intent().let {
+                    it.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    val uri = Uri.fromParts(
+                        "package",
+                        packageName, null
+                    )
+                    it.setData(uri)
+                    startActivity(it)
+                }
+                Toast.makeText(this,"Sms permissions required", Toast.LENGTH_SHORT).show()
+            }else
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(
@@ -120,6 +152,22 @@ class MainActivity : ComponentActivity() {
 
     private fun askNotificationPermissions() {
         if (!isSmsPermissionGranted()) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            ) {
+                Intent().let {
+                    it.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    val uri = Uri.fromParts(
+                        "package",
+                        packageName, null
+                    )
+                    it.setData(uri)
+                    startActivity(it)
+                }
+                Toast.makeText(this,"Notification permissions required", Toast.LENGTH_SHORT).show()
+            }else
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -137,7 +185,6 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
         askNotificationPermissions()
-        if (!isNotificationListenerPermissionGranted()) redirectToSettings()
     }
 
     private fun isSmsPermissionGranted(): Boolean {
