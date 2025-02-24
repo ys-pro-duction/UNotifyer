@@ -46,16 +46,9 @@ class MainActivity : ComponentActivity() {
                     Greeting(
                         modifier = Modifier.padding(innerPadding),
                         senderSetup = {
-                            startActivity(Intent(this@MainActivity, SenderActivity::class.java))
+                            openSenderSetup()
                         },
-                        receiverSetup = {
-                            startActivity(
-                                Intent(
-                                    this@MainActivity,
-                                    RecieverActivity::class.java
-                                )
-                            )
-                        },
+                        receiverSetup = { openReceiverSetup()},
                         senderReceiverChange = { toggleSenderOrReceiver(it) },
                         isRecieverOrSender = isReciever()
                     )
@@ -68,12 +61,15 @@ class MainActivity : ComponentActivity() {
 //        toggleSmsReciever(true)
     }
 
-    private fun allpermissionCheck() {
-        if (!isSmsPermissionGranted()) askSmsPermissions()
-        if (isReciever()) {
-            if (!isNotificationPermissionGranted()) askNotificationPermissions()
-        } else {
-            if (!isNotificationListenerPermissionGranted()) redirectToSettings()
+    private fun openReceiverSetup() {
+        if (PermissionLogic.isAllReceiverPermissionsGranted(this)) {
+            startActivity(Intent(this@MainActivity, RecieverActivity::class.java))
+        }
+    }
+
+    private fun openSenderSetup() {
+        if (PermissionLogic.isAllSenderPermissionsGranted(this)) {
+            startActivity(Intent(this@MainActivity, SenderActivity::class.java))
         }
     }
 
@@ -90,7 +86,6 @@ class MainActivity : ComponentActivity() {
             toggleNotificationListenerService(true)
             toggleSmsReciever(false)
         }
-        allpermissionCheck()
     }
 
     private fun toggleNotificationListenerService(enabled: Boolean) {
@@ -113,70 +108,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun askSmsPermissions() {
-        if (!isSmsPermissionGranted()) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    Manifest.permission.SEND_SMS
-                ) || ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    Manifest.permission.RECEIVE_SMS
-                ) || ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    Manifest.permission.READ_SMS
-                )
-            ) {
-                Intent().let {
-                    it.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                    val uri = Uri.fromParts(
-                        "package",
-                        packageName, null
-                    )
-                    it.setData(uri)
-                    startActivity(it)
-                }
-                Toast.makeText(this,"Sms permissions required", Toast.LENGTH_SHORT).show()
-            }else
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(
-                    Manifest.permission.SEND_SMS,
-                    Manifest.permission.RECEIVE_SMS,
-                    Manifest.permission.READ_SMS
-                ),
-                102
-            )
-
-        }
-    }
-
-    private fun askNotificationPermissions() {
-        if (!isSmsPermissionGranted()) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
-            ) {
-                Intent().let {
-                    it.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                    val uri = Uri.fromParts(
-                        "package",
-                        packageName, null
-                    )
-                    it.setData(uri)
-                    startActivity(it)
-                }
-                Toast.makeText(this,"Notification permissions required", Toast.LENGTH_SHORT).show()
-            }else
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                101
-            )
-
-        }
-    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -184,38 +115,12 @@ class MainActivity : ComponentActivity() {
         deviceId: Int
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
-        askNotificationPermissions()
+        println(permissions)
+        println(grantResults)
+        println(deviceId)
+        println(requestCode)
     }
 
-    private fun isSmsPermissionGranted(): Boolean {
-        return checkSelfPermission("android.permission.SEND_SMS") == PackageManager.PERMISSION_GRANTED
-                && checkSelfPermission("android.permission.RECEIVE_SMS") == PackageManager.PERMISSION_GRANTED
-                && checkSelfPermission("android.permission.READ_SMS") == PackageManager.PERMISSION_GRANTED
-    }
-
-    @SuppressLint("InlinedApi")
-    private fun isNotificationPermissionGranted(): Boolean {
-        return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private var someActivityResultLauncher: ActivityResultLauncher<Intent> =
-        registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-        }
-
-    private fun redirectToSettings() {
-        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-            someActivityResultLauncher.launch(this)
-        }
-    }
-
-    private fun isNotificationListenerPermissionGranted(): Boolean {
-        val componentName = ComponentName(this, MyNotificationListener::class.java)
-        val enabledListeners =
-            Settings.Secure.getString(this.contentResolver, "enabled_notification_listeners")
-        return enabledListeners?.contains(componentName.flattenToString()) ?: false
-    }
 
     @Composable
     fun Greeting(

@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.telephony.SmsManager
+import android.widget.Toast
 
 class MyNotificationListener : NotificationListenerService() {
     private var componentName: ComponentName? = null
@@ -49,14 +49,18 @@ class MyNotificationListener : NotificationListenerService() {
     }
 
     private fun smsSendMessage(text: String) {
-        val smsManager = getSystemService(SmsManager::class.java)
+        val number = getSharedPreferences("sender", MODE_PRIVATE).getString("number", null)
+        val simIndex = getSharedPreferences("sender", MODE_PRIVATE).getInt("sim", 0)
+        val smsManager = Utils.getSmsManager(this, simIndex)
         val paymentDetails = Utils.extractTransactionDetails(text) ?: return
         println(paymentDetails)
-        smsManager.sendTextMessage(
-            getSharedPreferences("sender", MODE_PRIVATE).getString("number", null), null, text,
-            null, null
-        )
+        if (smsManager != null) {
+            smsManager.sendTextMessage(number, null, text, null, null)
+        } else {
+            Toast.makeText(this, "Something went wrong", Toast.LENGTH_SHORT).show()
+        }
     }
+
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val packageName = sbn?.packageName ?: ""

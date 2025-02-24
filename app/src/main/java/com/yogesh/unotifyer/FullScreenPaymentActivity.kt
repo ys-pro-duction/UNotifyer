@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,11 +42,13 @@ import java.util.Locale
 import kotlin.math.min
 
 
-class FullScreenPaymentActivity : ComponentActivity() {
+class FullScreenPaymentActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var textToSpeech: TextToSpeech? = null
     private var preTTSPlayer: MediaPlayer? = null
     private var postTTSPlayer: MediaPlayer? = null
+    private var receiveSound: MediaPlayer? = null
     private var ttsFile: File? = null
+    private var paymentDetails: PaymentDetails? = null
 
     private val finishReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -58,10 +61,6 @@ class FullScreenPaymentActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        preTTSPlayer = MediaPlayer.create(this, R.raw.pre)
-        postTTSPlayer = MediaPlayer.create(this, R.raw.post)
-
         val paymentDetails = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getSerializableExtra(
                 "paymentDetails",
@@ -70,6 +69,7 @@ class FullScreenPaymentActivity : ComponentActivity() {
         } else {
             intent.getSerializableExtra("paymentDetails") as PaymentDetails
         }
+        this.paymentDetails = paymentDetails
         setContent {
             UNotifyerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -77,64 +77,92 @@ class FullScreenPaymentActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         paymentDetails = paymentDetails,
                         { finishAndRemoveTask() },
-                        { playSequence() }
+                        { playAudioWithTTS(paymentDetails.amount) }
                     )
                 }
             }
         }
-
-        textToSpeech = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                textToSpeech?.language = Locale("hi", "IN")
-                Utils.saveTTSAsTempFile(
-                    this,
-                    textToSpeech,
-                    paymentDetails.amount
-                ) { file ->
-                    ttsFile = file
-                    playSequence()
-                }
-            }
-        }
-
         window.addFlags(
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
-        Handler(Looper.getMainLooper()).postDelayed({finishAfterTransition()},30000)
-        registerReceiver(finishReceiver, IntentFilter(ACTION_FINISH_ACTIVITY),Context.RECEIVER_NOT_EXPORTED)
+        Handler(Looper.getMainLooper()).postDelayed({ finishAfterTransition() }, 30000)
+        registerReceiver(
+            finishReceiver,
+            IntentFilter(ACTION_FINISH_ACTIVITY),
+            Context.RECEIVER_NOT_EXPORTED
+        )
+
+        preTTSPlayer = MediaPlayer.create(this, R.raw.pre)
+        postTTSPlayer = MediaPlayer.create(this, R.raw.post)
+        textToSpeech = TextToSpeech(this, this)
+        playPaymetnReceiveSound()
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = textToSpeech?.setLanguage(Locale("hi", "IN"))
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                println("Language not supported")
+            } else {
+                playAudioWithTTS(paymentDetails?.amount.toString())
+            }
+        } else {
+            println("Initialization failed")
+        }
+    }
+
+    private fun playAudioWithTTS(text: String) {
+        preTTSPlayer?.setOnCompletionListener {
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
+        }
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                // TTS started
+            }
+
+            override fun onDone(utteranceId: String?) {
+                postTTSPlayer?.start()
+                postTTSPlayer?.setOnCompletionListener {
+                    setVolume(0.5f)
+                }
+            }
+
+            override fun onError(utteranceId: String?) {
+                // Handle error
+            }
+        })
+
+        preTTSPlayer?.start()
+    }
+
+
+    private fun playPaymetnReceiveSound() {
+        setVolume(2f)
+        receiveSound = MediaPlayer.create(this, R.raw.phonepe)
+        receiveSound?.start()
+    }
+
+    private fun setVolume(volume: Float) {
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val newVolume = min(maxVolume, (1 + currentVolume * volume).toInt())
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         unregisterReceiver(finishReceiver)
+        ttsFile?.delete()
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        preTTSPlayer?.release()
+        postTTSPlayer?.release()
+        receiveSound?.release()
+        super.onDestroy()
     }
 
-    private fun playSequence() {
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val midTTSPlayer = ttsFile?.let {
-            MediaPlayer().apply {
-                setDataSource(it.path)
-                prepare()
-                setOnCompletionListener {
-                    val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                    val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                    val newVolume = min(maxVolume, (currentVolume * 0.8).toInt())
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
-                    postTTSPlayer?.start()
-                }
-            }
-        }
-        preTTSPlayer?.setOnCompletionListener {
-            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val newVolume = min(maxVolume, (currentVolume * 1.2).toInt())
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
-            midTTSPlayer?.start()
-        }
-        preTTSPlayer?.start()
-    }
 
     @Composable
     fun Greeting(
@@ -197,4 +225,5 @@ class FullScreenPaymentActivity : ComponentActivity() {
             }
         }
     }
+
 }
