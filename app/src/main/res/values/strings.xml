@@ -3,4 +3,5 @@
     <string name="title_activity_sender">SenderActivity</string>
     <string name="title_activity_reciever">RecieverActivity</string>
     <string name="title_activity_full_screen_payment">FullScreenPaymentActivity</string>
+    <string name="title_activity_tts">ttsActivity</string>
 </resources>

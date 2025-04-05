@@ -49,6 +49,7 @@ class MyNotificationListener : NotificationListenerService() {
     }
 
     private fun smsSendMessage(text: String) {
+        println(text)
         val number = getSharedPreferences("sender", MODE_PRIVATE).getString("number", null)
         val simIndex = getSharedPreferences("sender", MODE_PRIVATE).getInt("sim", 0)
         val smsManager = Utils.getSmsManager(this, simIndex)

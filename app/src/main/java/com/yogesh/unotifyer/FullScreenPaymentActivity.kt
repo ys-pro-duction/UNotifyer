@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -117,6 +118,7 @@ class FullScreenPaymentActivity : ComponentActivity(), TextToSpeech.OnInitListen
         preTTSPlayer?.setOnCompletionListener {
             textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
         }
+        preTTSPlayer?.setDataSource(this, Uri.EMPTY)
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 // TTS started

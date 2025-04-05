@@ -14,9 +14,7 @@
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-
-
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission
         android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
@@ -32,11 +30,18 @@
         android:theme="@style/Theme.UNotifyer"
         tools:targetApi="31">
         <activity
+            android:name=".PhonePeUi"
+            android:exported="true"
+            android:label="PhonePeUi"
+            android:launchMode="singleTop"
+            android:showOnLockScreen="true"
+            android:theme="@style/Theme.UNotifyer" />
+        <activity
             android:name=".FullScreenPaymentActivity"
             android:exported="true"
-            android:showOnLockScreen="true"
-            android:launchMode="singleTop"
             android:label="@string/title_activity_full_screen_payment"
+            android:launchMode="singleTop"
+            android:showOnLockScreen="true"
             android:theme="@style/Theme.UNotifyer" />
         <activity
             android:name=".RecieverActivity"

@@ -66,7 +66,7 @@ fun RecieverMainView(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Setup to receive notification",
+            text = "Receive notification from",
             modifier = modifier
         )
         var mobileNumber by remember { mutableStateOf(senderNumber) }
@@ -74,8 +74,8 @@ fun RecieverMainView(
         TextField(
             value = mobileNumber,
             onValueChange = { mobileNumber = it },
-            label = { Text("Sender mobile number") },
-            placeholder = { Text("example: +911234567890") }
+//            label = { Text("Sender mobile number") },
+            placeholder = { Text("e.g. +911234567890,+911234567890") }
         )
         Row(
             horizontalArrangement = Arrangement.Start,

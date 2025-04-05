@@ -24,9 +24,10 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 smsMessageBuilder.append(message.displayMessageBody)
                 smsMessageBuilder.append("\n")
             }
+            println(smsMessageBuilder.toString())
             context.getSharedPreferences("reciever", Context.MODE_PRIVATE).getString("number", null)
                 ?.let {
-                    if (it == phoneNumber) {
+                    if (it.contains(phoneNumber,true)) {
                         val paymentDetails = Utils.extractTransactionDetails(smsMessageBuilder.toString()) ?: return
                         val dateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
                         val dt = LocalDateTime.now().format(dateTimeFormatter)

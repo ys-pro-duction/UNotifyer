@@ -8,12 +8,14 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,22 +35,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.os.bundleOf
 import com.yogesh.unotifyer.ui.theme.UNotifyerTheme
+import java.io.File
+import java.util.HashMap
+import java.util.Locale
+import kotlin.random.Random
 
 
 class MainActivity : ComponentActivity() {
+    private var tts: TextToSpeech? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             UNotifyerTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(modifier = Modifier
+                    .fillMaxSize()) { innerPadding ->
                     Greeting(
                         modifier = Modifier.padding(innerPadding),
                         senderSetup = {
                             openSenderSetup()
                         },
-                        receiverSetup = { openReceiverSetup()},
+                        receiverSetup = { openReceiverSetup() },
                         senderReceiverChange = { toggleSenderOrReceiver(it) },
                         isRecieverOrSender = isReciever()
                     )
@@ -59,7 +69,11 @@ class MainActivity : ComponentActivity() {
 //        Utils.showFullScreenPaymentNotification(this,PaymentDetails("100","","",""),"payment received")
 //        toggleNotificationListenerService(true)
 //        toggleSmsReciever(true)
+//        cmd notification post -S bigtext -t 'Title' 'Tag' 'Youve received Rs.5 from Yogesh Swami'
+
+
     }
+
 
     private fun openReceiverSetup() {
         if (PermissionLogic.isAllReceiverPermissionsGranted(this)) {
