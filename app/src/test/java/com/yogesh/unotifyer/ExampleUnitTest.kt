@@ -10,7 +10,7 @@ import org.junit.Assert.*
  * See [testing documentation](http://d.android.com/tools/testing).
  */
 class ExampleUnitTest {
-    fun extractTransactionDetails(notification: String): PaymentDetails {
+    private fun extractTransactionDetails(notification: String): PaymentDetails {
         // Updated regex with lookahead to stop capture before keywords
         val amountRegex = Regex(
             """(?:Rs\.?|₹)\s*(\X+?)(?=\s+(?:from|via|for|txn)\b|$)""",
@@ -52,7 +52,7 @@ class ExampleUnitTest {
         val txnIdMatch = txnIdRegex.find(notification)
         val txnId = txnIdMatch?.groupValues?.getOrNull(1)?.trim()
         if (amountInt == null || amountInt <= 0) throw Exception("Amount is null or <= zero")
-        return PaymentDetails(amountInt.toString(), sender, txnId)
+        return PaymentDetails(amountInt.toString(), sender, txnId,notification)
     }
 
 
@@ -76,6 +76,9 @@ class ExampleUnitTest {
             Pair(
                 "You've received Rs 𝟙𝟛𝟝 from Yogesh swami via PhonePe for txn T2504051656194141152025.",
                 135
+            ),Pair(
+                "You've received Rs 𝟷𝟶𝟼 from ******8253 via PhonePe for txn T2504061007266922191903.",
+                106
             )
         )
 
@@ -83,7 +86,7 @@ class ExampleUnitTest {
             val (amount, sender, txnId) = extractTransactionDetails(notification.key)
             println("Notification: $notification")
             print(" Amount: $amount")
-            assert(amount == notification.key)
+            assert(amount.toInt() == notification.value)
             print(" Sender: $sender")
             print(" Transaction ID: $txnId")
             println()
@@ -100,38 +103,9 @@ class ExampleUnitTest {
 
     @Test
     fun addition_isCorrect() {
-        println("𝟙" == "\uD835\uDFD9")
         main()
-        val a = arrayOf(
-            "\uD835\uDFF0",
-            "\uD835\uDFF1",
-            "\uD835\uDFF2",
-            "\uD835\uDFF3",
-            "\uD835\uDFF4",
-            "\uD835\uDFF5",
-            "\uD835\uDFF6",
-            "\uD835\uDFF7",
-            "\uD835\uDFF8",
-            "\uD835\uDFF9",
-        )
-        for (i in a.indices) {
-            println(a[i])
-        }
-        println(
-            "𝟎:\uD835\uDFF6" +
-                    " 𝟏:\uD835\uDFF7" +
-                    " 𝟐:\uD835\uDFF8" +
-                    " 𝟑:\uD835\uDFF9" +
-                    " 𝟒:\uD835\uDFFA" +
-                    " 𝟓:\uD835\uDFFB" +
-                    " 𝟔:\uD835\uDFFC" +
-                    " 𝟕:\uD835\uDFFD" +
-                    " 𝟖:\uD835\uDFFE" +
-                    " 𝟗:\uD835\uDFFF" +
-                    "𝟏𝟎:\uD835\uDFF1\uD835\uDFF0 𝟏𝟏:\uD835\uDFF1\uD835\uDFF1 𝟏𝟐: \uD835\uDFF1\uD835\uDFF2 𝟏𝟑: \uD835\uDFF1\uD835\uDFF3 𝟏𝟒: \uD835\uDFF1\uD835\uDFF4 𝟏𝟓: \uD835\uDFF1\uD835\uDFF5 𝟏𝟔: \uD835\uDFF1\uD835\uDFF6 𝟏𝟕: \uD835\uDFF1\uD835\uDFF7 𝟏𝟖: \uD835\uDFF1\uD835\uDFF8 𝟏𝟗: \uD835\uDFF1\uD835\uDFF9 𝟐𝟎: \uD835\uDFF2\uD835\uDFF0"
-        )
-        println("\uD835\uDFF7" == "\uD835\uDFF7")
-        println("\uD835\uDFF7")
+
     }
+
 }
 

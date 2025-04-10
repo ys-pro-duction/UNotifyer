@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import android.widget.Toast
 
 class MyNotificationListener : NotificationListenerService() {
@@ -56,7 +57,7 @@ class MyNotificationListener : NotificationListenerService() {
         val paymentDetails = Utils.extractTransactionDetails(text) ?: return
         println(paymentDetails)
         if (smsManager != null) {
-            smsManager.sendTextMessage(number, null, text, null, null)
+            smsManager.sendTextMessage(number, null, paymentDetails.notificationText, null, null)
         } else {
             Toast.makeText(this, "Something went wrong", Toast.LENGTH_SHORT).show()
         }

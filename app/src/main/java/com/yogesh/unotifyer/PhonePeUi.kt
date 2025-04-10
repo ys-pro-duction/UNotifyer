@@ -173,5 +173,5 @@ fun PaymentCard(rupees: String = "123", from: String = "Yogesh Swami") {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    NewPaymentScreen({}, PaymentDetails("100"))
+    NewPaymentScreen({}, PaymentDetails("100", notificationText = ""))
 }

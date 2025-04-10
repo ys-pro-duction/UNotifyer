@@ -36,7 +36,7 @@ class Utils {
                 println("amount: $rupee, name: $nameOrNumber, txn: $txnId")
                 try {
                     if (rupee == null) return null
-                    return PaymentDetails(rupee, nameOrNumber, txnId)
+                    return PaymentDetails(rupee, nameOrNumber, txnId, notificationText = text)
                 } catch (e: Exception) {
                     e.printStackTrace()
                     println("Error occurred while extracting transaction details: ${e.message}")
@@ -61,6 +61,7 @@ class Utils {
 
             val amountMatch = amountRegex.find(notification)
             val amountStr = amountMatch?.groupValues?.getOrNull(1)?.replace(",", "")
+            println(amountStr)
 
             val amountInt: Int? = amountStr?.filter { it.isDigit() }?.toIntOrNull() ?: amountStr?.let {
                 val normalDigits = mapOf(
@@ -91,7 +92,8 @@ class Utils {
             val txnIdMatch = txnIdRegex.find(notification)
             val txnId = txnIdMatch?.groupValues?.getOrNull(1)?.trim()
             if (amountInt == null || amountInt <= 0) return null
-            return PaymentDetails(amountInt.toString(),sender,txnId,notification)
+            return PaymentDetails(amountInt.toString(),sender,txnId, notificationText = notification.replace(
+                amountStr.toString(),amountInt.toString()))
         }
 
         @SuppressLint("MissingPermission")
